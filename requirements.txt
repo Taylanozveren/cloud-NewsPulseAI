@@ -1,0 +1,26 @@
+# Haber çekme ve RSS
+feedparser
+newsapi-python
+
+# Azure AI & OpenAI servisleri
+azure-ai-textanalytics>=5.3.0
+azure-cosmos>=4.6.0
+azure-search-documents>=11.4.0
+
+# LLM/RAG için
+langchain>=0.1.17
+langchain-openai>=0.1.8
+
+# Dashboard için
+streamlit>=1.31.0
+
+# Backend için (opsiyonel)
+fastapi
+uvicorn
+
+# Ortam değişkenleri için
+python-dotenv
+
+# (Gerekirse) requests, tqdm vs.
+requests
+tqdm
