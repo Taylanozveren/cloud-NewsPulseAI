@@ -12,34 +12,60 @@ headers = {
     "api-key": key,
 }
 
-# Burada anlamlı bir arama terimi gir (ör: trump, musk, economy, election, school vs.)
-query = "trump"
-data = {
-    "search": query,
-    "top": 5
+# Fetch all news
+all_data = {
+    "search": "*",
+    "top": 50   # Adjust as needed
 }
-resp = requests.post(url, headers=headers, json=data)
-results = resp.json().get("value", [])
+resp = requests.post(url, headers=headers, json=all_data)
+all_results = resp.json().get("value", [])
 
-if not results:
-    print("No news found for:", query)
+def pretty_datetime(dt):
+    try:
+        return datetime.fromisoformat(dt.replace("Z", "+00:00")).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return dt
+
+if not all_results:
+    print("No news found!")
 else:
-    print(f"\nTop {len(results)} results for search: '{query}'\n")
-    for i, r in enumerate(results, 1):
+    print(f"\nAll {len(all_results)} news articles:\n")
+    for i, r in enumerate(all_results, 1):
         content = r.get("content", {})
         print(f"--- Article {i} ---")
-        print("Source  :", content.get("source", "-"))
-        print("Title   :", content.get("title", "-"))
-        # Tarihi daha okunabilir göster
-        date_str = content.get("published", "-")
-        try:
-            date_str = datetime.fromisoformat(date_str.replace("Z", "+00:00")).strftime("%d.%m.%Y %H:%M")
-        except Exception:
-            pass
-        print("Date    :", date_str)
-        print("Summary :", content.get("summary", "-"))
-        print("Sentiment:", content.get("sentiment", "-"))
-        print("Keyphrases:", ", ".join(content.get("keyphrases", [])))
-        print("URL     :", content.get("url", "-"))
+        print("Source      :", content.get("source", "-"))
+        print("Title       :", content.get("title", "-"))
+        print("Date        :", pretty_datetime(content.get("published", "-")))
+        print("Sentiment   :", content.get("sentiment", "-"))
+        print("Keyphrases  :", ", ".join(content.get("keyphrases", [])))
+        print("Summary     :", content.get("summary", "-"))
+        print("URL         :", content.get("url", "-"))
+        print("Search Score:", r.get("@search.score", "-"))
         print()
 
+    print("\n==== News articles containing 'trump' (in title, summary, or keyphrases) ====\n")
+    trump_news = []
+    for i, r in enumerate(all_results, 1):
+        content = r.get("content", {})
+        text_all = (
+            content.get("title", "") +
+            content.get("summary", "") +
+            " ".join(content.get("keyphrases", []))
+        ).lower()
+        if "trump" in text_all:
+            trump_news.append((i, content, r.get("@search.score", "-")))
+
+    if not trump_news:
+        print("No news articles mentioning 'trump'.")
+    else:
+        for idx, content, score in trump_news:
+            print(f"--- Article {idx} ---")
+            print("Source      :", content.get("source", "-"))
+            print("Title       :", content.get("title", "-"))
+            print("Date        :", pretty_datetime(content.get("published", "-")))
+            print("Sentiment   :", content.get("sentiment", "-"))
+            print("Keyphrases  :", ", ".join(content.get("keyphrases", [])))
+            print("Summary     :", content.get("summary", "-"))
+            print("URL         :", content.get("url", "-"))
+            print("Search Score:", score)
+            print()
