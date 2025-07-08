@@ -25,3 +25,10 @@ python-dotenv
 requests
 tqdm
 azure-storage-blob>=12.0.0
+
+fastapi
+uvicorn
+requests
+
+streamlit
+matplotlib
