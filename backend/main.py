@@ -3,7 +3,7 @@ import requests
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime
 
 load_dotenv()
@@ -16,7 +16,7 @@ API_VERSION = "2023-07-01-Preview"
 app = FastAPI(
     title="NewsPulseAI Search API",
     description="Search and filter news articles indexed from Azure Blob Storage.",
-    version="1.1.0",
+    version="1.2.0",
 )
 
 app.add_middleware(
@@ -27,122 +27,154 @@ app.add_middleware(
 def azure_search(query: str = "*", top: int = 25, filters: Optional[str] = None):
     url = f"{SEARCH_ENDPOINT}/indexes/{INDEX_NAME}/docs/search?api-version={API_VERSION}"
     headers = {"Content-Type": "application/json", "api-key": SEARCH_KEY}
-    data = {"search": query, "top": top}
+    payload = {"search": query, "top": top}
     if filters:
-        data["filter"] = filters
-    r = requests.post(url, headers=headers, json=data)
-    return r.json().get("value", [])
+        payload["filter"] = filters
+    resp = requests.post(url, headers=headers, json=payload)
+    return resp.json().get("value", [])
+
 
 @app.get("/news", summary="List all news", tags=["News"])
 def get_news(top: int = 25):
     docs = azure_search(top=top)
     return [
         {
-            "title": d.get("content", {}).get("title"),
-            "source": d.get("content", {}).get("source"),
-            "date": d.get("content", {}).get("published"),
-            "sentiment": d.get("content", {}).get("sentiment"),
-            "summary": d.get("content", {}).get("summary"),
-            "url": d.get("content", {}).get("url"),
-            "keyphrases": d.get("content", {}).get("keyphrases", []),
+            "title": d["content"]["title"],
+            "source": d["content"]["source"],
+            "date": d["content"]["published"],
+            "sentiment": d["content"]["sentiment"],
+            "summary": d["content"]["summary"],
+            "url": d["content"]["url"],
+            "keyphrases": d["content"]["keyphrases"],
+            "category": d["content"].get("category", "general"),
         }
         for d in docs
     ]
+
 
 @app.get("/search", summary="Search news by keyword", tags=["News"])
 def search_news(q: str = Query(..., description="Search query"), top: int = 10):
     docs = azure_search(query=q, top=top)
     return [
         {
-            "title": d.get("content", {}).get("title"),
-            "source": d.get("content", {}).get("source"),
-            "date": d.get("content", {}).get("published"),
-            "sentiment": d.get("content", {}).get("sentiment"),
-            "summary": d.get("content", {}).get("summary"),
-            "url": d.get("content", {}).get("url"),
-            "keyphrases": d.get("content", {}).get("keyphrases", []),
+            "title": d["content"]["title"],
+            "source": d["content"]["source"],
+            "date": d["content"]["published"],
+            "sentiment": d["content"]["sentiment"],
+            "summary": d["content"]["summary"],
+            "url": d["content"]["url"],
+            "keyphrases": d["content"]["keyphrases"],
+            "category": d["content"].get("category", "general"),
         }
         for d in docs
     ]
 
+
 @app.get("/sentiment", summary="Filter news by sentiment", tags=["News"])
-def sentiment_news(type: str = Query("positive", enum=["positive", "neutral", "negative"]), top: int = 20):
-    # Azure Search filter syntax: content/sentiment eq 'positive'
+def sentiment_news(
+    type: str = Query("positive", enum=["positive", "neutral", "negative"]),
+    top: int = 20
+):
     filter_str = f"content/sentiment eq '{type}'"
     docs = azure_search(top=top, filters=filter_str)
     return [
         {
-            "title": d.get("content", {}).get("title"),
-            "source": d.get("content", {}).get("source"),
-            "date": d.get("content", {}).get("published"),
-            "sentiment": d.get("content", {}).get("sentiment"),
-            "summary": d.get("content", {}).get("summary"),
-            "url": d.get("content", {}).get("url"),
-            "keyphrases": d.get("content", {}).get("keyphrases", []),
+            "title": d["content"]["title"],
+            "source": d["content"]["source"],
+            "date": d["content"]["published"],
+            "sentiment": d["content"]["sentiment"],
+            "summary": d["content"]["summary"],
+            "url": d["content"]["url"],
+            "keyphrases": d["content"]["keyphrases"],
+            "category": d["content"].get("category", "general"),
         }
         for d in docs
     ]
 
+
 @app.get("/date", summary="Filter news by date range (ISO8601)", tags=["News"])
 def date_news(start: str, end: str, top: int = 20):
-    # ISO8601 örn: 2025-07-01T00:00:00Z
+    # örn: start="2025-07-01T00:00:00Z", end="2025-07-07T23:59:59Z"
     filter_str = f"content/published ge '{start}' and content/published le '{end}'"
     docs = azure_search(top=top, filters=filter_str)
     return [
         {
-            "title": d.get("content", {}).get("title"),
-            "source": d.get("content", {}).get("source"),
-            "date": d.get("content", {}).get("published"),
-            "sentiment": d.get("content", {}).get("sentiment"),
-            "summary": d.get("content", {}).get("summary"),
-            "url": d.get("content", {}).get("url"),
-            "keyphrases": d.get("content", {}).get("keyphrases", []),
+            "title": d["content"]["title"],
+            "source": d["content"]["source"],
+            "date": d["content"]["published"],
+            "sentiment": d["content"]["sentiment"],
+            "summary": d["content"]["summary"],
+            "url": d["content"]["url"],
+            "keyphrases": d["content"]["keyphrases"],
+            "category": d["content"].get("category", "general"),
         }
         for d in docs
     ]
+
 
 @app.get("/keyphrase", summary="Filter news by keyphrase", tags=["News"])
 def keyphrase_news(kw: str, top: int = 20):
-    # Basit anahtar kelime ile search (keyphrase alanında filtrelenemez, Azure’da string araması ile yapılır)
     docs = azure_search(query=kw, top=top)
     return [
         {
-            "title": d.get("content", {}).get("title"),
-            "source": d.get("content", {}).get("source"),
-            "date": d.get("content", {}).get("published"),
-            "sentiment": d.get("content", {}).get("sentiment"),
-            "summary": d.get("content", {}).get("summary"),
-            "url": d.get("content", {}).get("url"),
-            "keyphrases": d.get("content", {}).get("keyphrases", []),
+            "title": d["content"]["title"],
+            "source": d["content"]["source"],
+            "date": d["content"]["published"],
+            "sentiment": d["content"]["sentiment"],
+            "summary": d["content"]["summary"],
+            "url": d["content"]["url"],
+            "keyphrases": d["content"]["keyphrases"],
+            "category": d["content"].get("category", "general"),
         }
         for d in docs
     ]
 
+
+@app.get("/category", summary="Filter news by category", tags=["News"])
+def category_news(category: str = Query(..., description="Category name"), top: int = 20):
+    filter_str = f"content/category eq '{category}'"
+    docs = azure_search(top=top, filters=filter_str)
+    return [
+        {
+            "title": d["content"]["title"],
+            "source": d["content"]["source"],
+            "date": d["content"]["published"],
+            "sentiment": d["content"]["sentiment"],
+            "summary": d["content"]["summary"],
+            "url": d["content"]["url"],
+            "keyphrases": d["content"]["keyphrases"],
+            "category": d["content"].get("category", "general"),
+        }
+        for d in docs
+    ]
+
+
 @app.get("/news/{id}", summary="Get news by ID (URL)", tags=["News"])
 def get_news_by_id(id: str):
-    # id burada URL olacak (newsapi json id=article url)
     docs = azure_search(query=id, top=1)
     if not docs:
         return {"error": "Not found"}
     d = docs[0]
     return {
-        "title": d.get("content", {}).get("title"),
-        "source": d.get("content", {}).get("source"),
-        "date": d.get("content", {}).get("published"),
-        "sentiment": d.get("content", {}).get("sentiment"),
-        "summary": d.get("content", {}).get("summary"),
-        "url": d.get("content", {}).get("url"),
-        "keyphrases": d.get("content", {}).get("keyphrases", []),
+        "title": d["content"]["title"],
+        "source": d["content"]["source"],
+        "date": d["content"]["published"],
+        "sentiment": d["content"]["sentiment"],
+        "summary": d["content"]["summary"],
+        "url": d["content"]["url"],
+        "keyphrases": d["content"]["keyphrases"],
+        "category": d["content"].get("category", "general"),
     }
+
 
 @app.get("/stats", summary="Basic sentiment stats", tags=["Stats"])
 def sentiment_stats():
-    # Hepsini çekip (ilk 100), sentiment istatistiği dön.
     docs = azure_search(top=100)
     from collections import Counter
-    sentiments = [d.get("content", {}).get("sentiment", "-") for d in docs]
+    sentiments = [d["content"].get("sentiment", "-") for d in docs]
     counter = Counter(sentiments)
     return dict(counter)
+
 
 if __name__ == "__main__":
     import uvicorn

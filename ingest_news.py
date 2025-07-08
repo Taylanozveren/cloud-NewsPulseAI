@@ -1,14 +1,10 @@
-# ingest_news.py
-
 import os
 import json
-import uuid
-from datetime import datetime, timedelta, timezone
+import base64
 from dotenv import load_dotenv
 from newsapi import NewsApiClient
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.textanalytics import TextAnalyticsClient, ExtractiveSummaryAction
-
 from azure.storage.blob import BlobServiceClient
 
 load_dotenv()
@@ -27,21 +23,19 @@ container_client = blob_service.get_container_client(
     os.getenv("BLOB_CONTAINER")
 )
 
-from datetime import datetime, timedelta, timezone
+CATEGORIES = ["technology", "science", "business"]  # Dilediğini ekle/çıkar
 
-from datetime import datetime, timedelta
-
-def fetch_articles():
-    # Son 24 saatteki en güncel haberleri al
+def fetch_articles_with_category(category):
     resp = newsapi.get_top_headlines(
         language="en",
-        page_size=30,
-        # optionally country="us" or category="technology"
+        category=category,
+        page_size=15
     )
-    print("NewsAPI raw response:", resp.get("totalResults"), "articles")
-    return [a for a in resp.get("articles", []) if a.get("content")]
-
-
+    return [
+        {**a, "category": category}
+        for a in resp.get("articles", [])
+        if a.get("content")
+    ]
 
 def enrich(article: dict) -> dict:
     text = article["title"] + ". " + (article.get("content") or "")
@@ -51,7 +45,6 @@ def enrich(article: dict) -> dict:
     )
 
     summary = ""
-    # 2 katmanlı döngü: action_result (ilk katman), document_result (ikinci katman)
     action_results = poller.result()
     for action_result in action_results:
         for document_result in action_result:
@@ -69,21 +62,30 @@ def enrich(article: dict) -> dict:
         "sentiment": sentiment,
         "keyphrases": keyphrases,
         "source": article["source"]["name"],
-        "url": article["url"]
+        "url": article["url"],
+        "category": article.get("category", "general")
     }
 
+def url_to_blobname(url):
+    # Unique: url'yi base64 ile encode et, Windows'a uyumlu!
+    return base64.urlsafe_b64encode(url.encode("utf-8")).decode("ascii") + ".json"
 
 def upload_news_article(doc: dict):
-    blob_name = f"{uuid.uuid4()}.json"
+    blob_name = url_to_blobname(doc["url"])
     data = json.dumps(doc, ensure_ascii=False).encode("utf-8")
-    container_client.upload_blob(blob_name, data, overwrite=True)
-    print(f"Uploaded: {blob_name}")
+    container_client.upload_blob(blob_name, data, overwrite=True)  # overwrite=True: Günceller!
+    print(f"Uploaded/Updated: {blob_name}")
 
 def main():
-    print("Fetching articles…")
-    arts = fetch_articles()
-    print(f"Found {len(arts)} articles, enriching…")
-    for art in arts:
+    print("Fetching articles by category…")
+    all_arts = []
+    for cat in CATEGORIES:
+        arts = fetch_articles_with_category(cat)
+        all_arts.extend(arts)
+        print(f"Found {len(arts)} articles in category: {cat}")
+
+    print(f"Total {len(all_arts)} articles, enriching…")
+    for art in all_arts:
         enriched = enrich(art)
         upload_news_article(enriched)
     print("Done.")

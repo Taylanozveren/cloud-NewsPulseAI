@@ -32,3 +32,4 @@ requests
 
 streamlit
 matplotlib
+plotly
