@@ -1,0 +1,33 @@
+name: Ingest News Every 2 Days
+
+on:
+  schedule:
+    - cron: '0 6 */2 * *'  
+  workflow_dispatch:      
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install newsapi-python azure-ai-textanalytics azure-storage-blob python-dotenv
+
+      - name: Run ingest script
+        env:
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          LANG_ENDPOINT: ${{ secrets.LANG_ENDPOINT }}
+          LANG_KEY: ${{ secrets.LANG_KEY }}
+          STORAGE_CONN_STR: ${{ secrets.STORAGE_CONN_STR }}
+          BLOB_CONTAINER: ${{ secrets.BLOB_CONTAINER }}
+        run: python ingest_news.py
